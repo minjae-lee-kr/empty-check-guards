@@ -17,5 +17,5 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Unit and CLI tests
         run: npm test
-      - name: Integration scenarios (environment changes under the job)
+      - name: Integration scenarios (input changes between invocations)
         run: bash scripts/ci-scenarios.sh
