@@ -1,0 +1,27 @@
+[
+  {
+    "bucket": "2026-01-01T10:00:00Z",
+    "requests": 1200,
+    "errors": 2
+  },
+  {
+    "bucket": "2026-01-01T10:05:00Z",
+    "requests": 1200,
+    "errors": 2
+  },
+  {
+    "bucket": "2026-01-01T10:10:00Z",
+    "requests": 1200,
+    "errors": 2
+  },
+  {
+    "bucket": "2026-01-01T10:15:00Z",
+    "requests": 1200,
+    "errors": 2
+  },
+  {
+    "bucket": "2026-01-01T10:20:00Z",
+    "requests": 1200,
+    "errors": 2
+  }
+]

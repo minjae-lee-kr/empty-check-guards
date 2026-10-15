@@ -1,0 +1,20 @@
+{
+  "name": "empty-check-guards",
+  "version": "0.1.0",
+  "description": "Small, dependency-free guards that stop automation from reporting 'nothing found' when it really means 'nothing was checked'.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "scenarios": "bash scripts/ci-scenarios.sh",
+    "demo": "bash demo.sh"
+  },
+  "files": [
+    "src",
+    "examples",
+    "README.md"
+  ]
+}

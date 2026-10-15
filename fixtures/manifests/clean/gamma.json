@@ -1,0 +1,4 @@
+{
+  "service": "gamma",
+  "auth": { "mode": "oidc" }
+}

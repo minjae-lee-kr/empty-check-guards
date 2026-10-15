@@ -1,0 +1,5 @@
+{
+  "service": "beta",
+  "checks": { "skip": "being migrated this week; owner: team-b" },
+  "auth": { "mode": "legacy-token" }
+}
