@@ -20,6 +20,7 @@
 // as a stale one: absence is not freshness.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { heartbeatRecord, assessHeartbeat, heartbeatExitCode } from '../src/guards.js';
 
 export function readRecord(file) {
@@ -41,7 +42,7 @@ export function check(file, { maxAgeHours, now }) {
   return assessHeartbeat(readRecord(file), { maxAgeHours, now });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, file, ...rest] = process.argv.slice(2);
   const opt = {};
   for (let i = 0; i < rest.length; i++) {

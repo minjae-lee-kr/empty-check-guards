@@ -11,10 +11,10 @@ Everything here is synthetic: the services, the metrics, the thresholds. The fai
 | | |
 |---|---|
 | **What this shows** | A check result split into three parts that are usually blurred together: what was *found*, what was *covered*, and what happens *next*. Findings always produce `fail` (exit 1). A run with no findings and too little coverage is `inconclusive` (exit 2), not a pass. An override lets an inconclusive run proceed but is recorded and never changes the verdict. |
-| **Runtime** | Node 22 or newer, no dependencies, no install step. CI runs the tests and the scenario script on Node 22 and 24; both pass on the current commit (see the badge and the Actions tab). |
-| **Run it** | `npm test` (43 tests) · `npm run scenarios` (CLI contract against a scratch directory that is deleted and recreated between invocations: 11 exit-code assertions plus output and file-state assertions) · `npm run demo` (every fixture, one screen) |
+| **Runtime** | Node 22 or newer, no dependencies, no install step. The CI matrix is configured for Node 22 and 24 on Ubuntu and Windows. The badge above reports the published revision; it is not evidence about unpublished local changes. |
+| **Run it** | `node --test` · `node scripts/scenarios.mjs` (22 assertions over CLI exit codes, output and file state) · `node scripts/demo.mjs` (the fixture walkthrough). The matching `npm` scripts are convenient aliases. No Bash is required. |
 | **Key results** | see the table right below |
-| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm test` and [`scripts/ci-scenarios.sh`](scripts/ci-scenarios.sh) on every push and pull request. |
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm test` and [`scripts/scenarios.mjs`](scripts/scenarios.mjs) on every push and pull request. |
 | **What it does not guarantee** | That exit 2 is routed anywhere. That the override `by` value is who it says. That a *required* target was present: coverage is counted, so a minimum of 1 is met by any one target. That a bucket's timestamp falls inside the intended window. That the watchdog itself is watched. See [Limits](#limits). |
 
 | Input | Verdict | Exit | Evidence in the output |
@@ -156,7 +156,7 @@ A **per-bucket** threshold: any bucket above 1 % is a violation, so a short burs
 
 ## What the scenario script proves, and what it cannot
 
-[`scripts/ci-scenarios.sh`](scripts/ci-scenarios.sh) copies a fixture into a scratch directory and runs the real CLI while the input changes **between invocations**: present → deleted → recreated empty → overridden, then a refused override on findings, the no-traffic query, and a watchdog with no record. It asserts the exit code after every step, and where an exit code cannot show the guarantee it asserts the output (`[INCONCLUSIVE]` and `OVERRIDE recorded` after an override, `override refused` on findings) or the file state (no heartbeat file after a refused `touch`). The harness itself exits 0 when every expectation holds; a consuming pipeline that propagates the CLI's exit code is what would fail the step. The workflow runs it on Node 22 and 24, and both pass.
+[`scripts/scenarios.mjs`](scripts/scenarios.mjs) copies a fixture into a scratch directory and runs the real CLI while the input changes **between invocations**: present → deleted → recreated empty → overridden, then a refused override on findings, the no-traffic query, and a watchdog with no record. It asserts the exit code after every step, and where an exit code cannot show the guarantee it asserts the output (`[INCONCLUSIVE]` and `OVERRIDE recorded` after an override, `override refused` on findings) or the file state (no heartbeat file after a refused `touch`). The harness itself exits 0 when every expectation holds; a consuming pipeline that propagates the CLI's exit code is what would fail the step. It uses Node subprocess APIs directly and cleans up its own temporary directory, so the same contract can run on Windows and Unix.
 
 What this cannot prove is anything about *your* pipeline: whether exit 2 reaches a different channel than exit 1, whether the `--json` output is stored, whether anyone reads the `OVERRIDE recorded` line. Those are integration properties of the system that adopts the guards. It also does not model an input changing while a single invocation is running.
 
@@ -186,9 +186,10 @@ src/guards.js              CheckReport, formatReport, heartbeat helpers
 examples/                  three runnable scripts, each exporting its core for tests; --json on the first two
 fixtures/                  synthetic manifests and metric samples
 test/                      node:test suites for the core and for each example's exit codes and output
-scripts/ci-scenarios.sh    CLI contract while the input changes between invocations
+scripts/scenarios.mjs     portable CLI contract while inputs change between invocations
+scripts/demo.mjs          portable fixture walkthrough
 .github/workflows/ci.yml   tests + scenarios on Node 22 and 24
-demo.sh                    all scenarios in one screen
+demo.sh                    optional Bash wrapper for the Node demo
 ```
 
 ## License

@@ -16,6 +16,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { CheckReport, FindingKind, Status, formatReport } from '../src/guards.js';
 
 const DEPRECATED_AUTH_MODE = 'legacy-token';
@@ -78,7 +79,7 @@ function parseArgs(argv) {
   return args;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
     const override = args.overrideBy ? { by: args.overrideBy, reason: args.overrideReason } : undefined;

@@ -6,10 +6,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         node: [22, 24]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,4 +19,4 @@ jobs:
       - name: Unit and CLI tests
         run: npm test
       - name: Integration scenarios (input changes between invocations)
-        run: bash scripts/ci-scenarios.sh
+        run: node scripts/scenarios.mjs

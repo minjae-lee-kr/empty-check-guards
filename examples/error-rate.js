@@ -20,6 +20,7 @@
 //   node examples/error-rate.js <samples.json> [--expect-buckets 12] [--threshold 0.01] [--json]
 
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { CheckReport, formatReport } from '../src/guards.js';
 
 /**
@@ -45,7 +46,7 @@ export function evaluateErrorRate(samples, { expectBuckets = 12, threshold = 0.0
   return report.finish();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [file, ...rest] = process.argv.slice(2);
   if (!file) {
     console.error('usage: error-rate.js <samples.json> [--expect-buckets N] [--threshold R] [--json]');

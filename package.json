@@ -9,8 +9,8 @@
   },
   "scripts": {
     "test": "node --test",
-    "scenarios": "bash scripts/ci-scenarios.sh",
-    "demo": "bash demo.sh"
+    "scenarios": "node scripts/scenarios.mjs",
+    "demo": "node scripts/demo.mjs"
   },
   "files": [
     "src",
