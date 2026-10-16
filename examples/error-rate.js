@@ -27,12 +27,25 @@ import { CheckReport, formatReport } from '../src/guards.js';
  * @param {{bucket: string, requests: number, errors: number}[]} samples
  */
 export function evaluateErrorRate(samples, { expectBuckets = 12, threshold = 0.01, maxSkipRatio = 0.5 } = {}) {
+  if (!Array.isArray(samples)) throw new TypeError('samples must be an array');
+  if (!Number.isSafeInteger(expectBuckets) || expectBuckets < 1) {
+    throw new RangeError('expectBuckets must be a safe integer >= 1');
+  }
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+    throw new RangeError('threshold must be a finite number in [0, 1]');
+  }
   const minTargets = Math.max(1, expectBuckets - 1);
   const report = new CheckReport(`per-bucket error rate <= ${threshold * 100}% over ${expectBuckets} buckets`, { minTargets, maxSkipRatio });
 
   // Duplicate bucket ids throw inside the report; a query that returns the same bucket twice is a bug upstream.
   for (const s of samples) {
-    if (!(s.requests > 0)) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)
+        || typeof s.bucket !== 'string' || !s.bucket.trim()
+        || !Number.isSafeInteger(s.requests) || s.requests < 0
+        || !Number.isSafeInteger(s.errors) || s.errors < 0 || s.errors > s.requests) {
+      throw new TypeError('each sample must have a non-empty bucket id and safe integer counts: 0 <= errors <= requests');
+    }
+    if (s.requests === 0) {
       report.skipped(s.bucket, 'zero requests in bucket; an error rate over no traffic is undefined');
       continue;
     }

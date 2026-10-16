@@ -123,6 +123,8 @@ What the override records is a **claim**: `by` is whatever string the caller sup
 
 `assessHeartbeat` is a pure function of the record and the current time, which is what makes the stale/fresh boundary testable to the second. A record from the future is `invalid`, not fresh.
 
+The persisted record must contain a non-empty job name, a `pass` or `fail` verdict and a valid UTC timestamp (`YYYY-MM-DDTHH:mm:ss[.sss]Z`). A recent timestamp alone does not establish a conclusive run. Caller-supplied `now` must be a valid `Date`, and the age limit must be a finite positive number. These checks reject malformed data; they do not authenticate who wrote a record or bind it to an expected job.
+
 The check scripts do not write the heartbeat themselves; `examples/heartbeat.js` is a separate CLI, and composing the two is the job runner's work. In a shell step it is four lines:
 
 ```bash
@@ -140,19 +142,22 @@ exit $code
 |---|---|---|
 | Directory missing or unreadable | `sourceError`, inconclusive, exit 2 | different owner from "directory exists and is empty", so a different reason line |
 | Directory exists, matches nothing | `no targets were discovered`, inconclusive, exit 2 | a glob that stopped matching |
-| Manifest that does not parse | `unverifiable` **finding**, fail | a target you cannot inspect is not clean; calling it a skip would lower coverage silently |
+| Manifest that does not parse or lacks a valid `auth.mode` / skip reason | `unverifiable` **finding**, fail | a target you cannot inspect is not clean; calling it a skip would lower coverage silently |
 | Skip without a reason | `TypeError` at call time | silent skips are what the report exists to prevent |
 | Same target id scanned, skipped or marked unverifiable twice | `Error` at call time | a source that returns a target twice is an upstream bug, not extra coverage |
 | Violation reported on a target never scanned | `Error` at call time | you cannot judge what you did not inspect |
 | Uncaught error before the verdict | exit 2 | an unfinished run is "not proven", never 0 |
 | Process killed from outside | no exit code of ours | the gap the heartbeat exists for |
 | Error-rate bucket with zero requests | skipped with reason | the error rate is undefined when there are no requests |
+| Invalid sample shape, counts or numeric policy | throws; CLI exit 2 | malformed evidence must not silently become a zero-traffic skip or clean rate |
 | Heartbeat file missing | `missing`, exit 2 | absence is not freshness |
 | Heartbeat unreadable or in the future | `invalid`, exit 2 | clock skew and edited files should not look healthy |
 
 ### What the error-rate check is, precisely
 
 A **per-bucket** threshold: any bucket above 1 % is a violation, so a short burst is not diluted by a quiet hour. It is not the hour's aggregate `sum(errors) / sum(requests)`. The example requires at least 11 evaluable buckets out of 12, so it tolerates one missing or empty bucket; a missing bucket could contain errors, and that tolerance is a chosen trade-off, not a guarantee. Duplicate bucket ids throw. Bucket timestamps are counted, not validated against the window.
+
+Samples require non-empty string ids and safe integer counts with `0 <= errors <= requests`. Numeric strings, negative counts, non-finite values and fractional counts are rejected. Configuration also rejects numeric coercion. A syntactically valid JSON value is not automatically valid evidence.
 
 ## What the scenario script proves, and what it cannot
 

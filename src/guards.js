@@ -8,7 +8,7 @@
 //   3. the check never ran or never reported            -> a dead scheduler, a crash
 //      before the summary line
 //
-// Only the first one is safety. This module makes (2) and (3) distinguishable
+// Only the first one supports a clean verdict within the check's scope. This module makes (2) and (3) distinguishable
 // from (1) by separating three things a check result usually blurs together:
 //
 //   - what was FOUND      (findings: policy violations, or targets that could not be inspected)
@@ -41,6 +41,20 @@ export const FindingKind = Object.freeze({
   UNVERIFIABLE: 'unverifiable',
 });
 
+function requireText(value, label) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new TypeError(`${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function requireDate(value, label) {
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+    throw new TypeError(`${label} must be a valid Date`);
+  }
+  return value;
+}
+
 /**
  * Collects what a check looked at, what it skipped (and why), what it found, and whether the
  * target source itself was reachable, then produces a verdict that cannot be "pass" by accident.
@@ -64,10 +78,11 @@ export class CheckReport {
    * @param {number} [options.maxSkipRatio=0.5] skipped / (scanned + skipped) above this is a coverage shortfall.
    */
   constructor(name, { minTargets = 1, maxSkipRatio = 0.5 } = {}) {
-    if (!Number.isInteger(minTargets) || minTargets < 1) {
+    requireText(name, 'name');
+    if (!Number.isSafeInteger(minTargets) || minTargets < 1) {
       throw new RangeError('minTargets must be an integer >= 1; a check that accepts zero targets cannot distinguish "clean" from "not scanned"');
     }
-    if (!(maxSkipRatio >= 0 && maxSkipRatio < 1)) {
+    if (!Number.isFinite(maxSkipRatio) || !(maxSkipRatio >= 0 && maxSkipRatio < 1)) {
       throw new RangeError('maxSkipRatio must be in [0, 1)');
     }
     this.#name = name;
@@ -76,7 +91,7 @@ export class CheckReport {
   }
 
   #claim(id) {
-    const key = String(id);
+    const key = requireText(id, 'target id');
     if (this.#ids.has(key)) {
       throw new Error(`target ${JSON.stringify(key)} was already recorded; each target is scanned, skipped or unverifiable exactly once`);
     }
@@ -109,7 +124,8 @@ export class CheckReport {
    *   could not be inspected, so it is neither scanned nor skipped.
    */
   finding(id, message, { kind = FindingKind.VIOLATION } = {}) {
-    const key = String(id);
+    const key = requireText(id, 'target id');
+    requireText(message, 'finding message');
     if (kind === FindingKind.VIOLATION) {
       if (!this.#scanned.includes(key)) {
         throw new Error(`violation on ${JSON.stringify(key)} but it was never scanned; call scanned(id) first`);
@@ -168,8 +184,8 @@ export class CheckReport {
       exitCode: ExitCode[status],
       scanned,
       discovered,
-      skipped: [...this.#skipped],
-      findings: [...this.#findings],
+      skipped: this.#skipped.map((entry) => ({ ...entry })),
+      findings: this.#findings.map((entry) => ({ ...entry })),
       coverage: { sufficient: coverageReasons.length === 0, reasons: coverageReasons },
       thresholds: { minTargets: this.#minTargets, maxSkipRatio: this.#maxSkipRatio },
     };
@@ -225,17 +241,19 @@ export const Heartbeat = Object.freeze({
  * Build the record a job persists after a *conclusive* run, as its last step.
  *
  * The event a heartbeat records is "the check ran to completion and reached a verdict", not
- * "the check passed": a FAIL run is a healthy job doing its work, and the watchdog is there to
+ * "the check passed": a FAIL verdict still records a completed check, and the watchdog is there to
  * notice the job going silent, not the policy being broken. INCONCLUSIVE runs, overridden runs
  * and crashes do not write one, because nothing was proven and the job must not look alive on
  * their account.
  */
 export function heartbeatRecord({ job, runId, verdict, now = new Date() }) {
-  if (!job) throw new TypeError('job name is required');
+  requireText(job, 'job');
+  if (runId != null) requireText(runId, 'runId');
+  requireDate(now, 'now');
   if (verdict !== Status.PASS && verdict !== Status.FAIL) {
     throw new RangeError(`heartbeat records a conclusive run; verdict must be "${Status.PASS}" or "${Status.FAIL}", got ${JSON.stringify(verdict)}`);
   }
-  return { job, runId: runId ?? null, verdict, lastConclusiveRunAt: new Date(now).toISOString() };
+  return { job, runId: runId ?? null, verdict, lastConclusiveRunAt: now.toISOString() };
 }
 
 /**
@@ -247,14 +265,27 @@ export function heartbeatRecord({ job, runId, verdict, now = new Date() }) {
  * @param {Date}   [options.now]
  */
 export function assessHeartbeat(record, { maxAgeHours, now = new Date() }) {
-  if (!(maxAgeHours > 0)) throw new RangeError('maxAgeHours must be > 0');
+  if (!Number.isFinite(maxAgeHours) || !(maxAgeHours > 0)) throw new RangeError('maxAgeHours must be a finite number > 0');
+  requireDate(now, 'now');
   const base = { ageHours: null, lastConclusiveRunAt: null, verdict: record?.verdict ?? null, limitHours: maxAgeHours };
   if (record == null) {
     return { ...base, status: Heartbeat.MISSING,
       reason: 'no heartbeat record exists; the job has never completed a run, or the record was lost' };
   }
+  if (typeof record !== 'object' || Array.isArray(record)
+      || typeof record.job !== 'string' || !record.job.trim()
+      || (record.runId != null && (typeof record.runId !== 'string' || !record.runId.trim()))
+      || (record.verdict !== Status.PASS && record.verdict !== Status.FAIL)
+      || typeof record.lastConclusiveRunAt !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(record.lastConclusiveRunAt)) {
+    return { ...base, status: Heartbeat.INVALID,
+      reason: 'heartbeat record must identify a job, conclusive verdict and UTC timestamp; treat like missing' };
+  }
   const last = new Date(record.lastConclusiveRunAt);
-  if (Number.isNaN(last.getTime())) {
+  const canonicalTimestamp = record.lastConclusiveRunAt.includes('.')
+    ? record.lastConclusiveRunAt : record.lastConclusiveRunAt.replace(/Z$/, '.000Z');
+  if (Number.isNaN(last.getTime())
+      || last.toISOString() !== canonicalTimestamp) {
     return { ...base, status: Heartbeat.INVALID, lastConclusiveRunAt: record.lastConclusiveRunAt ?? null,
       reason: 'heartbeat record is unreadable; treat like missing' };
   }

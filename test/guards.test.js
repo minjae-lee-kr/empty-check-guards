@@ -182,7 +182,7 @@ describe('heartbeat', () => {
   });
 
   test('exactly at the limit is still FRESH; one second past is STALE', () => {
-    const rec = { lastConclusiveRunAt: '2026-01-01T12:00:00Z' };
+    const rec = { job: 'nightly', verdict: 'pass', lastConclusiveRunAt: '2026-01-01T12:00:00Z' };
     assert.equal(assessHeartbeat(rec, { maxAgeHours: 24, now }).status, Heartbeat.FRESH);
     assert.equal(assessHeartbeat(rec, { maxAgeHours: 24, now: new Date('2026-01-02T12:00:01Z') }).status, Heartbeat.STALE);
   });

@@ -8,7 +8,7 @@
 // when the signal stops.
 //
 // The event recorded here is "a conclusive run finished" (verdict pass or fail), not
-// "the check passed". A failing policy scan is a healthy job. An inconclusive or
+// "the check passed". A failing verdict still records a completed check. An inconclusive or
 // overridden run writes nothing, because it proved nothing.
 //
 // Usage:

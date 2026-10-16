@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url';
 import { CheckReport, FindingKind, Status, formatReport } from '../src/guards.js';
 
 const DEPRECATED_AUTH_MODE = 'legacy-token';
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** Pure core, reused by the tests. Returns the summary from CheckReport#finish. */
 export function scanManifests(dir, { minTargets = 1, maxSkipRatio = 0.5, override } = {}) {
@@ -44,9 +45,17 @@ export function scanManifests(dir, { minTargets = 1, maxSkipRatio = 0.5, overrid
       report.finding(id, `unparseable manifest: ${err.message}`, { kind: FindingKind.UNVERIFIABLE });
       continue;
     }
-    const skipReason = manifest?.checks?.skip;
-    if (skipReason) {
-      report.skipped(id, String(skipReason));
+    if (!isObject(manifest) || !isObject(manifest.auth)
+        || typeof manifest.auth.mode !== 'string' || !manifest.auth.mode.trim()
+        || (manifest.checks !== undefined && !isObject(manifest.checks))
+        || (manifest.checks?.skip !== undefined
+          && (typeof manifest.checks.skip !== 'string' || !manifest.checks.skip.trim()))) {
+      report.finding(id, 'invalid manifest: auth.mode and any checks.skip reason must be non-empty strings', { kind: FindingKind.UNVERIFIABLE });
+      continue;
+    }
+    const skipReason = manifest.checks?.skip;
+    if (skipReason !== undefined) {
+      report.skipped(id, skipReason);
       continue;
     }
     report.scanned(id);
