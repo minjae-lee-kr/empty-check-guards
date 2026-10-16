@@ -127,6 +127,8 @@ What the override records is a **claim**: `by` is whatever string the caller sup
 
 The persisted record must contain a non-empty job name, a `pass` or `fail` verdict and a valid UTC timestamp (`YYYY-MM-DDTHH:mm:ss[.sss]Z`). A recent timestamp alone does not establish a conclusive run. Caller-supplied `now` must be a valid `Date`, and the age limit must be a finite positive number. These checks reject malformed data; they do not authenticate who wrote a record or bind it to an expected job.
 
+`touch` writes and flushes a uniquely named staging file beside the destination, then replaces the record. A failed staging write or rename leaves the previous record intact; temporary files are cleaned up when possible. This avoids truncating the last valid heartbeat during an ordinary write failure. It is not a distributed lock or a promise of durability after power loss; concurrent writers remain last-replacement-wins, and filesystem behavior still matters.
+
 The check scripts do not write the heartbeat themselves; `examples/heartbeat.js` is a separate CLI, and composing the two is the job runner's work. In a shell step it is four lines:
 
 ```bash

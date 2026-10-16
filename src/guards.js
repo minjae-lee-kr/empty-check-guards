@@ -169,7 +169,8 @@ export class CheckReport {
       coverageReasons.push('no targets were discovered');
     } else if (scanned < this.#minTargets) {
       coverageReasons.push(`only ${scanned} target(s) were fully scanned (minimum ${this.#minTargets})`);
-    } else if (skipped / (scanned + skipped) > this.#maxSkipRatio) {
+    }
+    if (scanned + skipped > 0 && skipped / (scanned + skipped) > this.#maxSkipRatio) {
       coverageReasons.push(`${skipped} of ${scanned + skipped} targets were skipped (limit ${Math.round(this.#maxSkipRatio * 100)}%)`);
     }
 

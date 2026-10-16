@@ -89,11 +89,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const override = args.overrideBy ? { by: args.overrideBy, reason: args.overrideReason } : undefined;
     const summary = scanManifests(args.dir, { minTargets: args.minTargets, override });
     console.log(args.json ? JSON.stringify(summary, null, 2) : formatReport(summary));
-    process.exit(summary.exitCode);
+    process.exitCode = summary.exitCode;
   } catch (err) {
     // An uncaught error before the verdict is "not proven", never 0. (A process that is killed
     // from outside has no exit code of ours at all; that gap is what the heartbeat example covers.)
     console.error(`error: ${err.message}`);
-    process.exit(2);
+    process.exitCode = 2;
   }
 }

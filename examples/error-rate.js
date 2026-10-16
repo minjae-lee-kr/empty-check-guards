@@ -74,9 +74,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const samples = JSON.parse(readFileSync(file, 'utf8'));
     const summary = evaluateErrorRate(samples, opts);
     console.log(options['--json'] ? JSON.stringify(summary, null, 2) : formatReport(summary));
-    process.exit(summary.exitCode);
+    process.exitCode = summary.exitCode;
   } catch (err) {
     console.error(`error: ${err.message}`);
-    process.exit(2);
+    process.exitCode = 2;
   }
 }

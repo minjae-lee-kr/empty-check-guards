@@ -19,14 +19,17 @@
 // its own schedule and ideally from a different system. A missing file is exit 2, same
 // as a stale one: absence is not freshness.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, openSync, writeFileSync, fsyncSync, closeSync, renameSync, unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { dirname, basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { heartbeatRecord, assessHeartbeat, heartbeatExitCode } from '../src/guards.js';
 import { parseArguments } from '../src/cli.js';
 
 export function readRecord(file) {
   try {
-    return JSON.parse(readFileSync(file, 'utf8'));
+    const record = JSON.parse(readFileSync(file, 'utf8'));
+    return record === null ? { _error: 'record contains JSON null' } : record;
   } catch (err) {
     if (err.code === 'ENOENT') return null;
     return { lastConclusiveRunAt: undefined, _error: err.message }; // present but unreadable -> INVALID
@@ -35,7 +38,26 @@ export function readRecord(file) {
 
 export function touch(file, { job = 'unnamed-job', runId, verdict, now } = {}) {
   const record = heartbeatRecord({ job, runId, verdict, now });
-  writeFileSync(file, JSON.stringify(record, null, 2) + '\n');
+  // Stage beside the destination so a failed write cannot truncate the previous record.
+  // This is local replacement, not a distributed lock or a power-loss durability guarantee.
+  const temporary = join(dirname(file), `.${basename(file)}.${randomUUID()}.tmp`);
+  let descriptor;
+  let created = false;
+  try {
+    descriptor = openSync(temporary, 'wx', 0o600);
+    created = true;
+    writeFileSync(descriptor, JSON.stringify(record, null, 2) + '\n');
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
+    renameSync(temporary, file);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    if (created) {
+      try { unlinkSync(temporary); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+  }
   return record;
 }
 
@@ -55,17 +77,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const opt = { job: options['--job'], runId: options['--run-id'], verdict: options['--verdict'] };
       const r = touch(file, opt);
       console.log(`heartbeat written: ${r.job} completed a ${r.verdict} run at ${r.lastConclusiveRunAt}`);
-      process.exit(0);
-    }
-    if (cmd === 'check') {
+      process.exitCode = 0;
+    } else {
       const a = check(file, { maxAgeHours: Number(options['--max-age-hours']) });
       console.log(`[${a.status.toUpperCase()}] ${a.reason}`);
-      process.exit(heartbeatExitCode(a));
+      process.exitCode = heartbeatExitCode(a);
     }
-    console.error('usage: heartbeat.js touch <file> --verdict pass|fail [--job NAME] | check <file> --max-age-hours H');
-    process.exit(2);
   } catch (err) {
     console.error(`error: ${err.message}`);
-    process.exit(2);
+    process.exitCode = 2;
   }
 }
