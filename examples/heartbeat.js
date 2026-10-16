@@ -22,6 +22,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { heartbeatRecord, assessHeartbeat, heartbeatExitCode } from '../src/guards.js';
+import { parseArguments } from '../src/cli.js';
 
 export function readRecord(file) {
   try {
@@ -43,22 +44,21 @@ export function check(file, { maxAgeHours, now }) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [cmd, file, ...rest] = process.argv.slice(2);
-  const opt = {};
-  for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === '--job') opt.job = rest[++i];
-    else if (rest[i] === '--run-id') opt.runId = rest[++i];
-    else if (rest[i] === '--verdict') opt.verdict = rest[++i];
-    else if (rest[i] === '--max-age-hours') opt.maxAgeHours = Number(rest[++i]);
-  }
   try {
-    if (cmd === 'touch' && file) {
+    const [cmd, ...rest] = process.argv.slice(2);
+    if (cmd !== 'touch' && cmd !== 'check') throw new Error('command must be touch or check');
+    const { options, positionals } = parseArguments(rest, { values: cmd === 'touch'
+      ? ['--job', '--run-id', '--verdict'] : ['--max-age-hours'] });
+    if (positionals.length !== 1) throw new Error('exactly one heartbeat file is required');
+    const [file] = positionals;
+    if (cmd === 'touch') {
+      const opt = { job: options['--job'], runId: options['--run-id'], verdict: options['--verdict'] };
       const r = touch(file, opt);
       console.log(`heartbeat written: ${r.job} completed a ${r.verdict} run at ${r.lastConclusiveRunAt}`);
       process.exit(0);
     }
-    if (cmd === 'check' && file && opt.maxAgeHours) {
-      const a = check(file, { maxAgeHours: opt.maxAgeHours });
+    if (cmd === 'check') {
+      const a = check(file, { maxAgeHours: Number(options['--max-age-hours']) });
       console.log(`[${a.status.toUpperCase()}] ${a.reason}`);
       process.exit(heartbeatExitCode(a));
     }

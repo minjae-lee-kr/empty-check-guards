@@ -71,6 +71,8 @@ exit code: 2
 
 Both check examples accept `--json` and print the summary object instead, so a pipeline can read `status`, `coverage`, `findings[].kind` and `override` without parsing log text.
 
+All three CLIs reject unknown or repeated options, missing values and extra positional arguments with exit 2. Heartbeat flags are specific to `touch` or `check`. Use `--` before a positional path that begins with `-`. A typo must not silently change the policy that actually runs.
+
 ## Design
 
 The core is one class, `CheckReport` in [`src/guards.js`](src/guards.js), plus a few pure heartbeat functions. The examples are thin wrappers around it.

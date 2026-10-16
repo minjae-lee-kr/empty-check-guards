@@ -18,6 +18,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CheckReport, FindingKind, Status, formatReport } from '../src/guards.js';
+import { parseArguments } from '../src/cli.js';
 
 const DEPRECATED_AUTH_MODE = 'legacy-token';
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -71,21 +72,15 @@ export function scanManifests(dir, { minTargets = 1, maxSkipRatio = 0.5, overrid
 }
 
 function parseArgs(argv) {
-  const args = { dir: undefined, minTargets: 1, json: false };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--min') args.minTargets = Number(argv[++i]);
-    else if (a === '--json') args.json = true;
-    else if (a === '--override-by') args.overrideBy = argv[++i];
-    else if (a === '--override-reason') args.overrideReason = argv[++i];
-    else if (!args.dir) args.dir = a;
-    else throw new Error(`unexpected argument: ${a}`);
-  }
-  if (!args.dir) throw new Error('usage: scan-manifests.js <dir> [--min N] [--json] [--override-by WHO --override-reason WHY]');
-  if ((args.overrideBy || args.overrideReason) && !(args.overrideBy && args.overrideReason)) {
+  const { options, positionals } = parseArguments(argv, {
+    values: ['--min', '--override-by', '--override-reason'], flags: ['--json'],
+  });
+  if (positionals.length !== 1) throw new Error('usage: scan-manifests.js <dir> [--min N] [--json] [--override-by WHO --override-reason WHY]');
+  if (Object.hasOwn(options, '--override-by') !== Object.hasOwn(options, '--override-reason')) {
     throw new Error('--override-by and --override-reason must be given together');
   }
-  return args;
+  return { dir: positionals[0], minTargets: options['--min'] === undefined ? 1 : Number(options['--min']),
+    json: options['--json'], overrideBy: options['--override-by'], overrideReason: options['--override-reason'] };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

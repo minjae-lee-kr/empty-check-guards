@@ -22,6 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { CheckReport, formatReport } from '../src/guards.js';
+import { parseArguments } from '../src/cli.js';
 
 /**
  * @param {{bucket: string, requests: number, errors: number}[]} samples
@@ -60,22 +61,19 @@ export function evaluateErrorRate(samples, { expectBuckets = 12, threshold = 0.0
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [file, ...rest] = process.argv.slice(2);
-  if (!file) {
-    console.error('usage: error-rate.js <samples.json> [--expect-buckets N] [--threshold R] [--json]');
-    process.exit(2);
-  }
-  const opts = {};
-  let json = false;
-  for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === '--expect-buckets') opts.expectBuckets = Number(rest[++i]);
-    else if (rest[i] === '--threshold') opts.threshold = Number(rest[++i]);
-    else if (rest[i] === '--json') json = true;
-  }
   try {
+    const { options, positionals } = parseArguments(process.argv.slice(2), {
+      values: ['--expect-buckets', '--threshold'], flags: ['--json'],
+    });
+    if (positionals.length !== 1) throw new Error('usage: error-rate.js <samples.json> [--expect-buckets N] [--threshold R] [--json]');
+    const [file] = positionals;
+    const opts = {
+      ...(options['--expect-buckets'] !== undefined && { expectBuckets: Number(options['--expect-buckets']) }),
+      ...(options['--threshold'] !== undefined && { threshold: Number(options['--threshold']) }),
+    };
     const samples = JSON.parse(readFileSync(file, 'utf8'));
     const summary = evaluateErrorRate(samples, opts);
-    console.log(json ? JSON.stringify(summary, null, 2) : formatReport(summary));
+    console.log(options['--json'] ? JSON.stringify(summary, null, 2) : formatReport(summary));
     process.exit(summary.exitCode);
   } catch (err) {
     console.error(`error: ${err.message}`);
