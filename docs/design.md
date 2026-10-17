@@ -1,6 +1,6 @@
 # Design, contracts and limits
 
-[Overview](../README.md) · [한국어](../README.ko.md)
+[Overview](../README.md) · [한국어](design.ko.md)
 
 ## The problem
 
