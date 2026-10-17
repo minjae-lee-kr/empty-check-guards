@@ -2,7 +2,8 @@
 // The harness passes when the expected failures remain failures.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +24,7 @@ function run(expected,script,...args){
 function contains(text,pattern){assert.match(text,pattern);assertions++;}
 try{
   const manifests=join(scratch,'manifests');
-  cpSync(join(root,'fixtures','manifests','clean'),manifests,{recursive:true});
+  await cp(join(root,'fixtures','manifests','clean'),manifests,{recursive:true});
   console.log('Readable input → missing source → empty source → recorded override');
   contains(run(0,'scan-manifests.js',manifests),/\[PASS\]/);
   assert.equal(dirname(manifests),scratch);
