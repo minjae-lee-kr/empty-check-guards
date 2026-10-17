@@ -39,6 +39,8 @@ The consuming pipeline must decide whether an inconclusive run stops the workflo
 
 The core is [`CheckReport`](src/guards.js). [Design notes](docs/design.md) explain the examples, failure paths, heartbeat semantics and integration contract.
 
+For CI, use the [executable integration example](examples/ci-manifests.js): `node examples/ci-manifests.js ./manifests ./nightly.json`. It checks the same child's complete JSON report before refreshing the heartbeat. A startup crash returning exit 1 is not a completed fail verdict; an overridden inconclusive returning exit 0 is not a pass.
+
 ## What this does not establish
 
 Coverage is counted, not compared against a required identity set. Metric bucket timestamps are not checked against an expected window. Overrides and heartbeat writers are not authenticated. Heartbeat replacement is not a distributed lock or a power-loss durability guarantee. A consuming pipeline must route inconclusive results and monitor the watchdog itself.

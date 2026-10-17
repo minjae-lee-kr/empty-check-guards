@@ -39,6 +39,8 @@ node scripts/scenarios.mjs
 
 핵심은 [`CheckReport`](src/guards.js)입니다. [상세 설계](docs/design.ko.md)에는 예제별 실패 경로, 하트비트의 의미, 파이프라인 연동 범위가 있습니다.
 
+CI에서는 [연결 예제](examples/ci-manifests.js)를 사용할 수 있습니다: `node examples/ci-manifests.js ./manifests ./nightly.json`. 같은 자식 프로세스의 완전한 JSON 보고서를 확인한 뒤 하트비트를 갱신합니다. 초기화 실패로 1이 반환돼도 fail 판정은 아니며, 예외 승인된 inconclusive가 0을 반환해도 pass는 아닙니다.
+
 ## 확인하지 못하는 것
 
 검사 범위는 개수로 계산하며 반드시 포함돼야 할 대상 목록과 대조하지 않습니다. 지표 버킷의 시각이 요청한 시간 구간에 속하는지도 검사하지 않습니다. 예외 승인자와 하트비트 작성자의 신원을 인증하지 않습니다. 파일 교체는 분산 잠금이나 전원 장애 후의 내구성 보장이 아닙니다. 판정 불가 결과의 전달과 감시 작업 자체의 모니터링은 사용하는 파이프라인에서 구성해야 합니다.

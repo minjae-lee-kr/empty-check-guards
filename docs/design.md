@@ -106,16 +106,21 @@ The persisted record must contain a non-empty job name, a `pass` or `fail` verdi
 
 `touch` writes and flushes a uniquely named staging file beside the destination, then replaces the record. A failed staging write or rename leaves the previous record intact; temporary files are cleaned up when possible. This avoids truncating the last valid heartbeat during an ordinary write failure. It is not a distributed lock or a promise of durability after power loss; concurrent writers remain last-replacement-wins, and filesystem behavior still matters.
 
-The check scripts do not write the heartbeat themselves; `examples/heartbeat.js` is a separate CLI, and composing the two is the job runner's work. In a shell step it is four lines:
+The check scripts do not write the heartbeat themselves. The [CI integration example](../examples/ci-manifests.js) runs the fixed manifest CLI and writes the heartbeat only after validating that child's complete JSON result:
 
 ```bash
-node examples/scan-manifests.js ./manifests; code=$?
-case $code in
-  0) node examples/heartbeat.js touch ./nightly.json --job nightly --verdict pass ;;
-  1) node examples/heartbeat.js touch ./nightly.json --job nightly --verdict fail ;;
-esac   # exit 2 writes nothing
-exit $code
+node examples/ci-manifests.js ./manifests ./nightly.json
 ```
+
+This also works as a single Bash `-e` CI step. A completed failing check writes its heartbeat **before** the integration process returns exit 1. By contrast, `node check.js; code=$?` can exit the shell before the assignment under fail-fast settings. [GitHub's shell defaults](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell) enable this behavior.
+
+More fundamentally, **exit 1 is not proof of a fail verdict**: Node can return it after an initialization error, before any targets were inspected. The integration captures stdout from the same child in memory, parses one complete JSON summary, checks its identity, counts, coverage policy, verdict and override fields, and requires the process status to agree. Spawn errors, termination, truncated output and report/status mismatch are integration errors (exit 2), with no heartbeat write. A previous report file is never read. Windows may expose termination as a numeric exit instead of a POSIX signal; absence of a valid completed report still rejects it.
+
+A crash after printing a valid fail report can also return exit 1. This owned CLI's conclusive-report contract is stdout JSON with **empty stderr**, so unexpected stderr rejects the run even when JSON and exit code otherwise agree. That includes a post-report exception or pipe error. It conservatively rejects runtime warnings too; the integration does not guess which stderr text is harmless.
+
+The wrapper accepts the existing `--min`, `--override-by` and `--override-reason` options. An overridden inconclusive report still exits 0 and still leaves the heartbeat unchanged. A validated pass/fail records job `manifest-policy` and the integration run ID. If persistence fails, the result retains the check verdict, returns integration error 2 and labels the heartbeat `unconfirmed`; it does not claim that replacement succeeded or that the prior bytes necessarily remain. The standalone heartbeat's ordinary write-failure guarantees still apply.
+
+The child is the adjacent owned CLI, with no arbitrary executable or shell option. Each output stream is limited to 1 MiB, with a 30-second child timeout; exceeding a bound is not a completed verdict. The JSON result distinguishes `check`, `child`, and `heartbeat`. This validates a trusted checker's protocol, not the truthfulness of a malicious process or a hostile execution environment. It does not independently re-scan the manifests.
 
 ### Failure paths
 
@@ -127,7 +132,8 @@ exit $code
 | Skip without a reason | `TypeError` at call time | silent skips are what the report exists to prevent |
 | Same target id scanned, skipped or marked unverifiable twice | `Error` at call time | a source that returns a target twice is an upstream bug, not extra coverage |
 | Violation reported on a target never scanned | `Error` at call time | you cannot judge what you did not inspect |
-| Uncaught error before the verdict | exit 2 | an unfinished run is "not proven", never 0 |
+| Error caught by the CLI's main body | exit 2 | an unfinished run is "not proven", never 0 |
+| Initialization failure before the guarded main body | may exit 1 without a report; integration rejects it | process failure must not impersonate a conclusive fail verdict |
 | Process killed from outside | no exit code of ours | the gap the heartbeat exists for |
 | Error-rate bucket with zero requests | skipped with reason | the error rate is undefined when there are no requests |
 | Invalid sample shape, counts or numeric policy | throws; CLI exit 2 | malformed evidence must not silently become a zero-traffic skip or clean rate |
