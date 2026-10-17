@@ -4,9 +4,9 @@
 
 **“Nothing found” is not the same as “nothing checked.”**
 
-A scheduled check can find no violations because it inspected clean input—or because its directory is empty or its query returned no traffic. If the job never reaches a verdict, it may leave no report at all. These gaps need different responses from a detected violation.
+A manifest scan reports zero violations. If its input directory was empty, that result says nothing about whether the manifests are clean. An error-rate query with no traffic and a job that never reaches a verdict also need separate handling.
 
-This standalone lab uses synthetic inputs, real file reads and CLIs to keep findings, minimum coverage and permission to continue separate. `CheckReport` returns pass, fail or inconclusive; a separate heartbeat records how recently a run reached pass or fail. The guards have no runtime dependencies.
+These personal examples read fictional manifests and metric samples through real CLIs. `CheckReport` counts inspected and skipped inputs, collects findings and returns pass, fail or inconclusive. A separate heartbeat CLI checks for a missing or stale pass/fail record. The guards have no runtime dependencies.
 
 ## Try the counterexample
 
@@ -29,7 +29,7 @@ The demo runs manifest and error-rate checks. The scenario harness adds changing
 
 **An override changes whether execution may continue; it does not turn uncertainty into evidence.** Findings cannot be overridden.
 
-The tradeoff is an extra decision for the consuming pipeline: route an inconclusive result separately instead of treating every nonzero exit as a detected violation. JSON retains the original verdict even when an explicit override permits exit code 0.
+The consuming pipeline must decide whether an inconclusive run stops the workflow or proceeds with a recorded override. Exit code 0 alone is not enough: JSON retains the original verdict.
 
 ## Three decisions to inspect
 
