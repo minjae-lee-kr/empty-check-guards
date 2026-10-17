@@ -112,6 +112,15 @@ The check scripts do not write the heartbeat themselves. The [CI integration exa
 node examples/ci-manifests.js ./manifests ./nightly.json
 ```
 
+Route the integration result first, then the check verdict: top-level `status` describes the runner, while `check.status` describes the scan. A fresh heartbeat means a conclusive check completed recently, including a fail.
+
+| Integration result | Operator decision |
+|---|---|
+| `status: integration-error` | Investigate the runner or persistence. Retain `check` if present; `heartbeat: unconfirmed` requires checking the stored record. |
+| `status: checked`, `check.status: fail` | Send findings and any coverage gap to the target owner. The completed check refreshes its heartbeat. |
+| `status: checked`, `check.status: inconclusive` | Restore coverage or review the recorded override. Even exit 0 leaves the heartbeat unchanged. |
+| `status: checked`, `check.status: pass` | Continue; the heartbeat records this conclusive run. |
+
 This also works as a single Bash `-e` CI step. A completed failing check writes its heartbeat **before** the integration process returns exit 1. By contrast, `node check.js; code=$?` can exit the shell before the assignment under fail-fast settings. [GitHub's shell defaults](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell) enable this behavior.
 
 More fundamentally, **exit 1 is not proof of a fail verdict**: Node can return it after an initialization error, before any targets were inspected. The integration captures stdout from the same child in memory, parses one complete JSON summary, checks its identity, counts, coverage policy, verdict and override fields, and requires the process status to agree. Spawn errors, termination, truncated output and report/status mismatch are integration errors (exit 2), with no heartbeat write. A previous report file is never read. Windows may expose termination as a numeric exit instead of a POSIX signal; absence of a valid completed report still rejects it.

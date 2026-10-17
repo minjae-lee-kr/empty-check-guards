@@ -112,6 +112,15 @@ exit code: 2
 node examples/ci-manifests.js ./manifests ./nightly.json
 ```
 
+먼저 연결 실행의 상태를 보고, 그다음 검사 판정을 확인합니다. 최상위 `status`는 실행·저장 상태이고 `check.status`는 검사 판정입니다. 최근 하트비트가 있어도 검사에 통과했다는 뜻은 아닙니다. fail도 판정에 도달한 실행입니다.
+
+| 연결 실행 결과 | 다음 결정 |
+|---|---|
+| `status: integration-error` | 실행기나 저장 경로를 확인합니다. `check`가 있으면 판정도 보존하고, `heartbeat: unconfirmed`이면 저장된 기록을 확인합니다. |
+| `status: checked`, `check.status: fail` | 대상 담당자에게 발견 사항과 검사 누락을 함께 전달합니다. 판정에 도달했으므로 하트비트는 갱신됩니다. |
+| `status: checked`, `check.status: inconclusive` | 검사 범위를 복구하거나 기록된 예외 승인을 검토합니다. 종료 코드 0이어도 하트비트는 그대로입니다. |
+| `status: checked`, `check.status: pass` | 진행합니다. 하트비트에는 이번 판정이 기록됩니다. |
+
 Bash `-e`를 쓰는 CI 단계에서도 한 명령으로 실행할 수 있습니다. fail 판정에 도달한 검사는 연결 프로세스가 종료 코드 1을 반환하기 **전에** 하트비트를 기록합니다. 반면 `node check.js; code=$?`는 실패 시 즉시 종료하는 설정에서 변수 대입 전에 셸이 끝날 수 있습니다. [GitHub의 기본 셸 설정](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell)도 이 동작을 사용합니다.
 
 더 근본적으로, **종료 코드 1만으로 fail 판정을 확인할 수는 없습니다.** Node는 초기화 오류로 검사 대상을 읽기도 전에 1을 반환할 수 있습니다. 연결 예제는 같은 자식 프로세스의 stdout을 메모리에서 수집하고, 완전한 JSON 보고서 하나를 파싱해 검사 식별자, 대상 수, 검사 범위 정책, 판정과 예외 승인 필드를 확인합니다. 보고서와 프로세스 종료 코드도 일치해야 합니다. 실행 시작 오류, 강제 종료, 잘린 출력, 판정·종료 코드 불일치는 통합 오류(종료 코드 2)이며 하트비트를 쓰지 않습니다. 이전 보고서 파일은 읽지 않습니다. Windows에서는 강제 종료가 POSIX 신호 대신 숫자 종료 코드로 보일 수 있지만, 완료된 보고서가 없으면 마찬가지로 거절합니다.
