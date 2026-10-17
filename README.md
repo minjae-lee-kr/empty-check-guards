@@ -4,7 +4,9 @@
 
 **“Nothing found” is not the same as “nothing checked.”**
 
-Small, dependency-free guards that keep findings, coverage and the next decision separate. A successful process with zero findings cannot pass if the required coverage was missing.
+A scheduled check can find no violations because it inspected clean input—or because its directory is empty or its query returned no traffic. If the job never reaches a verdict, it may leave no report at all. These gaps need different responses from a detected violation.
+
+This standalone lab uses synthetic inputs, real file reads and CLIs to keep findings, minimum coverage and permission to continue separate. `CheckReport` returns pass, fail or inconclusive; a separate heartbeat records how recently a run reached pass or fail. The guards have no runtime dependencies.
 
 ## Try the counterexample
 
@@ -16,7 +18,7 @@ node --test
 node scripts/scenarios.mjs
 ```
 
-The demo compares synthetic manifest scans, error-rate samples and a job heartbeat. The scenario harness invokes the real CLIs while inputs are deleted, recreated or overridden; it checks output and persisted state as well as exit codes.
+The demo runs manifest and error-rate checks. The scenario harness adds changing inputs, overrides and heartbeat handling through the real CLIs; it checks output and persisted state as well as exit codes.
 
 | Observation | Verdict | Exit | Decision |
 | --- | --- | ---: | --- |
@@ -26,6 +28,8 @@ The demo compares synthetic manifest scans, error-rate samples and a job heartbe
 | Explicit override of an inconclusive result | **still inconclusive** | 0 | Record the actor claim, reason and waived gap. |
 
 **An override changes whether execution may continue; it does not turn uncertainty into evidence.** Findings cannot be overridden.
+
+The tradeoff is an extra decision for the consuming pipeline: route an inconclusive result separately instead of treating every nonzero exit as a detected violation. JSON retains the original verdict even when an explicit override permits exit code 0.
 
 ## Three decisions to inspect
 
